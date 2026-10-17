@@ -33,7 +33,7 @@ public class AiService {
         this.model = model;
         this.maxTokens = maxTokens;
         this.client = RestClient.builder().baseUrl("https://api.anthropic.com").build();
-      
+
     }
 
     @SuppressWarnings("unchecked")
