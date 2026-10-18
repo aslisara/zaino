@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'explore.dart';
 
 final String baseUrl = kIsWeb ? 'http://localhost:8080' : 'http://10.0.2.2:8080';
 String? authToken;
@@ -185,6 +186,14 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Seyahatlerim'),
         actions: [
+          IconButton(
+            tooltip: 'Keşfet',
+            icon: const Icon(Icons.public),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ExplorePage()),
+            ),
+          ),
           IconButton(
             tooltip: 'Favoriler',
             icon: const Icon(Icons.favorite_border),
@@ -570,7 +579,9 @@ class _GuideLine {
 }
 
 class AiGuidePage extends StatefulWidget {
-  const AiGuidePage({super.key});
+  const AiGuidePage({super.key, this.initialCity, this.initialCountry});
+  final String? initialCity;
+  final String? initialCountry;
   @override
   State<AiGuidePage> createState() => _AiGuidePageState();
 }
@@ -584,6 +595,16 @@ class _AiGuidePageState extends State<AiGuidePage> {
   String? _error;
   bool _loading = false;
   final Map<String, dynamic> _favIds = {}; // "TYPE|ad" -> favori id
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialCity != null) {
+      _city.text = widget.initialCity!;
+      _country.text = widget.initialCountry ?? '';
+      WidgetsBinding.instance.addPostFrameCallback((_) => _generate());
+    }
+  }
 
   String _extractText(dynamic json) {
     if (json is String) return json;
