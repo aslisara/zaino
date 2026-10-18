@@ -5,8 +5,9 @@ import com.exploreworld.user.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Locale;
 
 @Service
 public class AuthService {
@@ -15,35 +16,47 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
 
-    @Transactional
     public UserResponse register(RegisterRequest request) {
-        String email = request.email().trim().toLowerCase();
+        String email = normalize(request.email());
 
         if (userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu e-posta zaten kayıtlı");
         }
 
-        User user = userRepository.save(
-                new User(email, passwordEncoder.encode(request.password()), request.displayName()));
+        User user = new User(
+                email,
+                passwordEncoder.encode(request.password()),
+                request.displayName());
 
-        return new UserResponse(user.getId(), user.getEmail(), user.getDisplayName());
+        User saved = userRepository.save(user);
+        // UYARI: UserResponse'un yapısı sende farklıysa sadece bu satırı kendi koduna göre düzelt.
+        return new UserResponse(saved.getId(), saved.getEmail(), saved.getDisplayName());
     }
 
-    @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
-        String email = request.email().trim().toLowerCase();
+        String email = normalize(request.email());
 
         User user = userRepository.findByEmail(email)
-                .filter(u -> passwordEncoder.matches(request.password(), u.getPasswordHash()))
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "E-posta veya şifre hatalı"));
 
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "E-posta veya şifre hatalı");
+        }
+
         return new TokenResponse(jwtService.generateToken(user));
+    }
+
+    // Locale.ROOT: Türkçe bilgisayarda "I" harfi "ı" olmasın diye
+    private String normalize(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }
