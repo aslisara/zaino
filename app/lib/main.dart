@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'city_photos.dart';
 import 'explore.dart';
 
 final String baseUrl = kIsWeb ? 'http://localhost:8080' : 'http://10.0.2.2:8080';
@@ -842,6 +843,14 @@ class _AiGuidePageState extends State<AiGuidePage> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          if (lines != null) ...[
+            CityPhotos(
+              key: ValueKey('$_genCity|$_genCountry'),
+              city: _genCity,
+              country: _genCountry,
+            ),
+            const SizedBox(height: 16),
+          ],
           TextField(
               controller: _city,
               decoration: const InputDecoration(

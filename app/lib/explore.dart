@@ -233,6 +233,16 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
   String? _loadingMore;
   String? _moreError;
   final _cityInput = TextEditingController();
+  final Map<String, List<List<double>>?> _shapeCache = {};
+
+  /// Seçili ülkenin sınır şekli (küçük ada ülkelerinde yoktur).
+  List<List<double>>? _shapeFor(Country? c) {
+    if (c == null) return null;
+    return _shapeCache.putIfAbsent(c.name, () {
+      final data = kCountryShapes[c.name];
+      return data == null ? null : _parseLines(data, maxStep: 2.5);
+    });
+  }
 
   late final AnimationController _spin;
   AnimationController? _fly;
@@ -428,6 +438,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
                       lat0: _lat0,
                       zoom: _zoom,
                       selected: sel,
+                      shape: _shapeFor(sel),
                       marker: cs.tertiary,
                       markerSel: cs.error,
                     ),
@@ -641,6 +652,7 @@ class _GlobePainter extends CustomPainter {
   final double lat0;
   final double zoom;
   final Country? selected;
+  final List<List<double>>? shape;
   final Color marker;
   final Color markerSel;
 
@@ -649,6 +661,7 @@ class _GlobePainter extends CustomPainter {
     required this.lat0,
     required this.zoom,
     required this.selected,
+    required this.shape,
     required this.marker,
     required this.markerSel,
   });
@@ -751,6 +764,22 @@ class _GlobePainter extends CustomPainter {
       ..strokeWidth = 0.6;
     for (final line in kBorderLines) {
       _strokeFlat(canvas, proj, border, line);
+    }
+
+    // seçili ülkeyi renklendir
+    if (shape != null) {
+      final fill = Paint()..color = const Color(0xFFFFB300).withValues(alpha: 0.78);
+      final edge = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..strokeJoin = StrokeJoin.round;
+      for (final ring in shape!) {
+        final path = _clipRing(proj, ring);
+        if (path == null) continue;
+        canvas.drawPath(path, fill);
+        canvas.drawPath(path, edge);
+      }
     }
 
     // ışık: sol üstte parlama, kenarlarda karartma
@@ -936,5 +965,5 @@ class _GlobePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GlobePainter old) =>
-      old.lon0 != lon0 || old.lat0 != lat0 || old.zoom != zoom || old.selected != selected;
+      old.lon0 != lon0 || old.lat0 != lat0 || old.zoom != zoom || old.selected != selected || !identical(old.shape, shape);
 }
