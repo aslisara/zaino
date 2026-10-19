@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'l10n.dart';
 import 'main.dart' show AiGuidePage, baseUrl, authHeaders;
+import 'names_en.dart';
 import 'world_data.dart';
 
 // ---------------- VERİ ----------------
@@ -340,31 +341,35 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
       _moreError = null;
     });
     try {
-      final prompt = '${c.name} ülkesinde gezilecek en popüler 15 şehir veya bölgeyi yaz. '
-          'Sadece adları Türkçe yaz, virgülle ayır, tek satırda ver. '
-          'Numara, açıklama ya da başka hiçbir şey yazma.';
+      final prompt = appLang.value == 'en'
+          ? 'List the 15 most popular cities or regions to visit in ${cn(c.name)}. '
+              'Write only the names in English, comma-separated, on a single line. '
+              'No numbering, descriptions or anything else.'
+          : '${cn(c.name)} ülkesinde gezilecek en popüler 15 şehir veya bölgeyi yaz. '
+              'Sadece adları Türkçe yaz, virgülle ayır, tek satırda ver. '
+              'Numara, açıklama ya da başka hiçbir şey yazma.';
       final res = await http.post(
         Uri.parse('$baseUrl/api/ai'),
         headers: authHeaders(),
         body: jsonEncode({'prompt': prompt}),
       );
       if (res.statusCode != 200) {
-        throw Exception('Sunucu ${res.statusCode} döndü');
+        throw Exception(t('Sunucu ${res.statusCode} döndü', 'Server returned ${res.statusCode}'));
       }
       final text = _extractText(jsonDecode(utf8.decode(res.bodyBytes)));
-      final known = c.cities.map((e) => e.toLowerCase()).toSet();
+      final known = c.cities.map((e) => cityn(e).toLowerCase()).toSet();
       final list = text
           .split(RegExp(r'[,\n;]'))
           .map((e) => e.replaceAll(RegExp(r'^[\s\d\.\-\*•]+'), '').replaceAll(RegExp(r'[*_]'), '').trim())
           .where((e) => e.isNotEmpty && e.length < 40 && !known.contains(e.toLowerCase()))
           .toSet()
           .toList();
-      if (list.isEmpty) throw Exception('Şehir listesi boş geldi');
+      if (list.isEmpty) throw Exception(t('Şehir listesi boş geldi', 'The city list came back empty'));
       if (!mounted) return;
       setState(() => _extra[c.name] = list);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _moreError = 'Daha fazla şehir alınamadı: $e');
+      setState(() => _moreError = t('Daha fazla şehir alınamadı: $e', 'Could not get more cities: $e'));
     } finally {
       if (mounted) setState(() => _loadingMore = null);
     }
@@ -378,7 +383,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
     try {
       final lang = appLang.value == 'en' ? 'English' : 'Turkish';
       final prompt = 'Recommend one well-known REAL book (novel or non-fiction) and one '
-          'well-known REAL song that represent or relate to ${c.name}. '
+          'well-known REAL song that represent or relate to ${cn(c.name)}. '
           'Answer ONLY with valid JSON, no markdown: '
           '{"book":{"title":"","author":"","why":"max 12 words"},'
           '"song":{"title":"","artist":"","why":"max 12 words"}}. '
@@ -424,7 +429,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => AiGuidePage(initialCity: city, initialCountry: c.name),
+        builder: (_) => AiGuidePage(initialCity: cityn(city), initialCountry: cn(c.name)),
       ),
     );
   }
@@ -450,15 +455,18 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
     final cs = Theme.of(context).colorScheme;
     final sel = _selected;
     final shown = kCountries
-        .where((c) => _query.isEmpty || _fold(c.name).contains(_fold(_query)))
+        .where((c) =>
+            _query.isEmpty ||
+            _fold(c.name).contains(_fold(_query)) ||
+            _fold(countryAltName(c.name)).contains(_fold(_query)))
         .toList()
-      ..sort((a, b) => _fold(a.name).compareTo(_fold(b.name)));
+      ..sort((a, b) => _fold(cn(a.name)).compareTo(_fold(cn(b.name))));
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Keşfet'),
+        title: Text(t('Keşfet', 'Explore')),
         actions: [
           IconButton(
-            tooltip: 'Yapay zekâ rehberi',
+            tooltip: t('Yapay zekâ rehberi', 'AI guide'),
             icon: const Icon(Icons.auto_awesome),
             onPressed: () => Navigator.push(
               context,
@@ -520,7 +528,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: Text(
-                'Küreyi döndür, bir noktaya dokun ya da aşağıdan ülke seç.',
+                t('Küreyi döndür, bir noktaya dokun ya da aşağıdan ülke seç.', 'Rotate the globe, tap a point or pick a country below.'),
                 style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
@@ -537,9 +545,9 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(sel.name, style: Theme.of(context).textTheme.titleLarge),
+                      Text(cn(sel.name), style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: 6),
-                      Text('Şehir seç, yapay zekâ rehberi açılsın:',
+                      Text(t('Şehir seç, yapay zekâ rehberi açılsın:', 'Pick a city to open the AI guide:'),
                           style: Theme.of(context).textTheme.bodySmall),
                       const SizedBox(height: 8),
                       Wrap(
@@ -549,7 +557,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
                           for (final city in [...sel.cities, ...?_extra[sel.name]])
                             ActionChip(
                               avatar: const Icon(Icons.location_city, size: 18),
-                              label: Text(city),
+                              label: Text(cityn(city)),
                               onPressed: () => _openGuide(sel, city),
                             ),
                           if (_extra[sel.name] == null)
@@ -562,8 +570,8 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
                                     )
                                   : const Icon(Icons.add, size: 18),
                               label: Text(_loadingMore == sel.name
-                                  ? 'Yükleniyor...'
-                                  : 'Daha fazla şehir'),
+                                  ? t('Yükleniyor...', 'Loading...')
+                                  : t('Daha fazla şehir', 'More cities')),
                               onPressed: _loadingMore != null ? null : () => _loadMore(sel),
                             ),
                         ],
@@ -614,7 +622,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
                         controller: _cityInput,
                         decoration: InputDecoration(
                           isDense: true,
-                          labelText: 'Listede yok mu? Şehri kendin yaz',
+                          labelText: t('Listede yok mu? Şehri kendin yaz', 'Not listed? Type the city yourself'),
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.arrow_forward),
                             onPressed: () {
@@ -639,7 +647,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
               decoration: InputDecoration(
                 isDense: true,
                 prefixIcon: const Icon(Icons.search),
-                hintText: 'Ülke ara (${kCountries.length} ülke)',
+                hintText: t('Ülke ara (${kCountries.length} ülke)', 'Search country (${kCountries.length} countries)'),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
               ),
               onChanged: (v) => setState(() => _query = v.trim()),
@@ -655,7 +663,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
               itemBuilder: (_, i) {
                 final c = shown[i];
                 return ChoiceChip(
-                  label: Text(c.name),
+                  label: Text(cn(c.name)),
                   selected: sel == c,
                   onSelected: (_) => _select(c),
                 );

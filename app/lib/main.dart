@@ -6,6 +6,7 @@ import 'ai_plan.dart';
 import 'city_photos.dart';
 import 'explore.dart';
 import 'l10n.dart';
+import 'names_en.dart';
 import 'trip_map.dart';
 import 'trip_share.dart';
 import 'weather.dart';
@@ -107,7 +108,7 @@ class _LoginPageState extends State<LoginPage> {
           }),
         );
         if (r.statusCode != 200 && r.statusCode != 201) {
-          setState(() => _error = _errorFrom(r, 'Kayıt başarısız'));
+          setState(() => _error = _errorFrom(r, t('Kayıt başarısız', 'Sign-up failed')));
           return;
         }
       }
@@ -122,10 +123,10 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => const MainShell()));
       } else {
-        setState(() => _error = _errorFrom(res, 'Giriş başarısız'));
+        setState(() => _error = _errorFrom(res, t('Giriş başarısız', 'Login failed')));
       }
     } catch (e) {
-      setState(() => _error = 'Sunucuya ulaşılamadı');
+      setState(() => _error = t('Sunucuya ulaşılamadı', 'Could not reach the server'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -158,7 +159,7 @@ class _LoginPageState extends State<LoginPage> {
                     Text('Explore World',
                         style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    Text('Yapay zekâ destekli seyahat rehberin',
+                    Text(t('Yapay zekâ destekli seyahat rehberin', 'Your AI-powered travel guide'),
                         style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                     const SizedBox(height: 24),
                     Card(
@@ -169,8 +170,8 @@ class _LoginPageState extends State<LoginPage> {
                             if (_register) ...[
                               TextField(
                                 controller: _name,
-                                decoration: const InputDecoration(
-                                  labelText: 'Adın',
+                                decoration: InputDecoration(
+                                  labelText: t('Adın', 'Your name'),
                                   prefixIcon: Icon(Icons.person_outline),
                                 ),
                               ),
@@ -179,8 +180,8 @@ class _LoginPageState extends State<LoginPage> {
                             TextField(
                               controller: _email,
                               keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
-                                labelText: 'E-posta',
+                              decoration: InputDecoration(
+                                labelText: t('E-posta', 'Email'),
                                 prefixIcon: Icon(Icons.mail_outline),
                               ),
                             ),
@@ -189,8 +190,8 @@ class _LoginPageState extends State<LoginPage> {
                               controller: _password,
                               obscureText: true,
                               onSubmitted: (_) => _loading ? null : _submit(),
-                              decoration: const InputDecoration(
-                                labelText: 'Şifre',
+                              decoration: InputDecoration(
+                                labelText: t('Şifre', 'Password'),
                                 prefixIcon: Icon(Icons.lock_outline),
                               ),
                             ),
@@ -205,8 +206,8 @@ class _LoginPageState extends State<LoginPage> {
                               child: FilledButton(
                                 onPressed: _loading ? null : _submit,
                                 child: Text(_loading
-                                    ? 'Bekleyin...'
-                                    : (_register ? 'Kayıt ol' : 'Giriş yap')),
+                                    ? t('Bekleyin...', 'Please wait...')
+                                    : (_register ? t('Kayıt ol', 'Sign up') : t('Giriş yap', 'Log in'))),
                               ),
                             ),
                             TextButton(
@@ -217,8 +218,8 @@ class _LoginPageState extends State<LoginPage> {
                                         _error = null;
                                       }),
                               child: Text(_register
-                                  ? 'Hesabın var mı? Giriş yap'
-                                  : 'Hesabın yok mu? Kayıt ol'),
+                                  ? t('Hesabın var mı? Giriş yap', 'Already have an account? Log in')
+                                  : t('Hesabın yok mu? Kayıt ol', 'No account yet? Sign up')),
                             ),
                           ],
                         ),
@@ -270,23 +271,23 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: _select,
-        destinations: const [
+        destinations: [
           NavigationDestination(
               icon: Icon(Icons.public_outlined),
               selectedIcon: Icon(Icons.public),
-              label: 'Keşfet'),
+              label: t('Keşfet', 'Explore')),
           NavigationDestination(
               icon: Icon(Icons.favorite_border),
               selectedIcon: Icon(Icons.favorite),
-              label: 'Favoriler'),
+              label: t('Favoriler', 'Favorites')),
           NavigationDestination(
               icon: Icon(Icons.luggage_outlined),
               selectedIcon: Icon(Icons.luggage),
-              label: 'Seyahatlerim'),
+              label: t('Seyahatlerim', 'My trips')),
           NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person),
-              label: 'Profil'),
+              label: t('Profil', 'Profile')),
         ],
       ),
     );
@@ -331,11 +332,11 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final name = '${_me?['displayName'] ?? _me?['name'] ?? 'Gezgin'}';
+    final name = '${_me?['displayName'] ?? _me?['name'] ?? t('Gezgin', 'Traveler')}';
     final email = '${_me?['email'] ?? ''}';
     final initial = name.isNotEmpty ? name.characters.first.toUpperCase() : '?';
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(title: Text(t('Profil', 'Profile'))),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -355,38 +356,55 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Text(email, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
             ),
           const SizedBox(height: 28),
-          Text('Görünüm', style: tt.titleSmall),
+          Text(t('Görünüm', 'Appearance'), style: tt.titleSmall),
           const SizedBox(height: 8),
           ValueListenableBuilder<ThemeMode>(
             valueListenable: themeMode,
             builder: (_, mode, __) => SegmentedButton<ThemeMode>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                     value: ThemeMode.system,
                     icon: Icon(Icons.brightness_auto),
-                    label: Text('Sistem')),
+                    label: Text(t('Sistem', 'System'))),
                 ButtonSegment(
                     value: ThemeMode.light,
                     icon: Icon(Icons.light_mode),
-                    label: Text('Açık')),
+                    label: Text(t('Açık', 'Light'))),
                 ButtonSegment(
                     value: ThemeMode.dark,
                     icon: Icon(Icons.dark_mode),
-                    label: Text('Koyu')),
+                    label: Text(t('Koyu', 'Dark'))),
               ],
               selected: {mode},
               onSelectionChanged: (s) => themeMode.value = s.first,
             ),
           ),
           const SizedBox(height: 28),
+          Text(t('Dil', 'Language'), style: tt.titleSmall),
+          const SizedBox(height: 8),
+          ValueListenableBuilder<String>(
+            valueListenable: appLang,
+            builder: (_, lang, __) => SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'tr', label: Text('Türkçe')),
+                ButtonSegment(value: 'en', label: Text('English')),
+              ],
+              selected: {lang},
+              onSelectionChanged: (s) {
+                appLang.value = s.first;
+                rebuildAll();
+              },
+            ),
+          ),
+          const SizedBox(height: 28),
           OutlinedButton.icon(
             onPressed: _logout,
             icon: const Icon(Icons.logout),
-            label: const Text('Çıkış yap'),
+            label: Text(t('Çıkış yap', 'Log out')),
           ),
           const SizedBox(height: 24),
           Center(
-            child: Text('Explore World · yapay zekâ destekli seyahat rehberi',
+            child: Text(t('Explore World · yapay zekâ destekli seyahat rehberi', 'Explore World · AI-powered travel guide'),
                 style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
           ),
         ],
@@ -431,14 +449,14 @@ class _HomePageState extends State<HomePage> {
         if (!mounted) return;
         setState(() {
           _loading = false;
-          _error = 'Liste alınamadı (${res.statusCode})';
+          _error = t('Liste alınamadı (${res.statusCode})', 'Could not load the list (${res.statusCode})');
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Sunucuya ulaşılamadı';
+        _error = t('Sunucuya ulaşılamadı', 'Could not reach the server');
       });
     }
   }
@@ -468,10 +486,10 @@ class _HomePageState extends State<HomePage> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Seyahatlerim'),
+        title: Text(t('Seyahatlerim', 'My trips')),
         actions: [
           IconButton(
-            tooltip: 'Yenile',
+            tooltip: t('Yenile', 'Refresh'),
             icon: const Icon(Icons.refresh),
             onPressed: _load,
           ),
@@ -480,7 +498,7 @@ class _HomePageState extends State<HomePage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addTrip,
         icon: const Icon(Icons.add),
-        label: const Text('Yeni gezi'),
+        label: Text(t('Yeni gezi', 'New trip')),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -493,18 +511,18 @@ class _HomePageState extends State<HomePage> {
                           const SizedBox(height: 120),
                           Icon(Icons.luggage_outlined, size: 64, color: cs.outline),
                           const SizedBox(height: 12),
-                          const Center(child: Text('Henüz gezin yok.')),
+                          Center(child: Text(t('Henüz gezin yok.', 'No trips yet.'))),
                           const SizedBox(height: 4),
-                          const Center(child: Text('Aşağıdaki "Yeni gezi" düğmesiyle başla.')),
+                          Center(child: Text(t('Aşağıdaki "Yeni gezi" düğmesiyle başla.', 'Start with the "New trip" button below.'))),
                         ])
                       : ListView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                           itemCount: _trips.length,
                           itemBuilder: (context, i) {
-                            final t = _trips[i];
-                            final days = (t['days'] is List)
-                                ? (t['days'] as List).length
-                                : (t['dayCount'] ?? '?');
+                            final trip = _trips[i];
+                            final days = (trip['days'] is List)
+                                ? (trip['days'] as List).length
+                                : (trip['dayCount'] ?? '?');
                             return Card(
                               margin: const EdgeInsets.symmetric(vertical: 6),
                               child: ListTile(
@@ -514,15 +532,15 @@ class _HomePageState extends State<HomePage> {
                                   backgroundColor: cs.primaryContainer,
                                   child: Icon(Icons.luggage, color: cs.onPrimaryContainer),
                                 ),
-                                title: Text('${t['title'] ?? ''}',
+                                title: Text('${trip['title'] ?? ''}',
                                     style: const TextStyle(fontWeight: FontWeight.w600)),
                                 subtitle: Text(
-                                    '${t['city'] ?? ''}, ${t['country'] ?? ''} · $days gün'),
+                                    t('${trip['city'] ?? ''}, ${trip['country'] ?? ''} · $days gün', '${trip['city'] ?? ''}, ${trip['country'] ?? ''} · $days days')),
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (_) => TripDetailPage(tripId: t['id'])),
+                                      builder: (_) => TripDetailPage(tripId: trip['id'])),
                                 ),
                               ),
                             );
@@ -555,7 +573,7 @@ class _CreateTripPageState extends State<CreateTripPage> {
         _country.text.trim().isEmpty ||
         days < 1 ||
         days > 30) {
-      setState(() => _error = 'Tüm alanları doldur (gün 1-30).');
+      setState(() => _error = t('Tüm alanları doldur (gün 1-30).', 'Fill in all fields (days 1-30).'));
       return;
     }
     setState(() {
@@ -584,10 +602,10 @@ class _CreateTripPageState extends State<CreateTripPage> {
           'dayCount': days,
         });
       } else {
-        setState(() => _error = 'Kaydedilemedi (${res.statusCode})');
+        setState(() => _error = t('Kaydedilemedi (${res.statusCode})', 'Could not save (${res.statusCode})'));
       }
     } catch (e) {
-      setState(() => _error = 'Hata: $e');
+      setState(() => _error = t('Hata: $e', 'Error: $e'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -596,37 +614,37 @@ class _CreateTripPageState extends State<CreateTripPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Yeni gezi')),
+      appBar: AppBar(title: Text(t('Yeni gezi', 'New trip'))),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           TextField(
               controller: _title,
-              decoration: const InputDecoration(
-                  labelText: 'Başlık', border: OutlineInputBorder())),
+              decoration: InputDecoration(
+                  labelText: t('Başlık', 'Title'), border: OutlineInputBorder())),
           const SizedBox(height: 12),
           TextField(
               controller: _city,
-              decoration: const InputDecoration(
-                  labelText: 'Şehir', border: OutlineInputBorder())),
+              decoration: InputDecoration(
+                  labelText: t('Şehir', 'City'), border: OutlineInputBorder())),
           const SizedBox(height: 12),
           TextField(
               controller: _country,
-              decoration: const InputDecoration(
-                  labelText: 'Ülke', border: OutlineInputBorder())),
+              decoration: InputDecoration(
+                  labelText: t('Ülke', 'Country'), border: OutlineInputBorder())),
           const SizedBox(height: 12),
           TextField(
               controller: _days,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Gün sayısı', border: OutlineInputBorder())),
+              decoration: InputDecoration(
+                  labelText: t('Gün sayısı', 'Number of days'), border: OutlineInputBorder())),
           const SizedBox(height: 12),
           if (_error != null)
             Text(_error!, style: const TextStyle(color: Colors.red)),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _saving ? null : _save,
-            child: Text(_saving ? 'Kaydediliyor...' : 'Kaydet'),
+            child: Text(_saving ? t('Kaydediliyor...', 'Saving...') : t('Kaydet', 'Save')),
           ),
         ],
       ),
@@ -672,11 +690,11 @@ class _TripDetailPageState extends State<TripDetailPage> {
         });
       } else {
         if (!mounted) return;
-        setState(() => _error = 'Yüklenemedi (${res.statusCode})');
+        setState(() => _error = t('Yüklenemedi (${res.statusCode})', 'Could not load (${res.statusCode})'));
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Sunucuya ulaşılamadı');
+      setState(() => _error = t('Sunucuya ulaşılamadı', 'Could not reach the server'));
     }
   }
 
@@ -686,29 +704,29 @@ class _TripDetailPageState extends State<TripDetailPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('$dayNumber. gün - durak ekle'),
+        title: Text(t('$dayNumber. gün - durak ekle', 'Day $dayNumber - add stop')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
                 controller: name,
                 autofocus: true,
-                decoration: const InputDecoration(
-                    labelText: 'Yer adı', border: OutlineInputBorder())),
+                decoration: InputDecoration(
+                    labelText: t('Yer adı', 'Place name'), border: OutlineInputBorder())),
             const SizedBox(height: 12),
             TextField(
                 controller: note,
-                decoration: const InputDecoration(
-                    labelText: 'Not (isteğe bağlı)', border: OutlineInputBorder())),
+                decoration: InputDecoration(
+                    labelText: t('Not (isteğe bağlı)', 'Note (optional)'), border: OutlineInputBorder())),
           ],
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Vazgeç')),
+              child: Text(t('Vazgeç', 'Cancel'))),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Ekle')),
+              child: Text(t('Ekle', 'Add'))),
         ],
       ),
     );
@@ -726,10 +744,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
         }),
       );
       if (res.statusCode != 200 && res.statusCode != 201) {
-        _msg('Eklenemedi (${res.statusCode})');
+        _msg(t('Eklenemedi (${res.statusCode})', 'Could not add (${res.statusCode})'));
       }
     } catch (e) {
-      _msg('Sunucuya ulaşılamadı');
+      _msg(t('Sunucuya ulaşılamadı', 'Could not reach the server'));
     }
     await _load();
   }
@@ -743,10 +761,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
         body: jsonEncode({'dayNumber': dayNumber, 'position': position}),
       );
       if (res.statusCode != 200 && res.statusCode != 204) {
-        _msg('Taşınamadı (${res.statusCode})');
+        _msg(t('Taşınamadı (${res.statusCode})', 'Could not move (${res.statusCode})'));
       }
     } catch (e) {
-      _msg('Sunucuya ulaşılamadı');
+      _msg(t('Sunucuya ulaşılamadı', 'Could not reach the server'));
     }
     await _load();
   }
@@ -758,10 +776,10 @@ class _TripDetailPageState extends State<TripDetailPage> {
         headers: authHeaders(),
       );
       if (res.statusCode != 200 && res.statusCode != 204) {
-        _msg('Silinemedi (${res.statusCode})');
+        _msg(t('Silinemedi (${res.statusCode})', 'Could not delete (${res.statusCode})'));
       }
     } catch (e) {
-      _msg('Sunucuya ulaşılamadı');
+      _msg(t('Sunucuya ulaşılamadı', 'Could not reach the server'));
     }
     await _load();
   }
@@ -771,7 +789,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
     final days = (_trip?['days'] as List<dynamic>?) ?? [];
     return Scaffold(
       appBar: AppBar(
-        title: Text('${_trip?['title'] ?? 'Gezi'}'),
+        title: Text('${_trip?['title'] ?? t('Gezi', 'Trip')}'),
         actions: [
           if (_trip != null)
             IconButton(
@@ -798,16 +816,16 @@ class _TripDetailPageState extends State<TripDetailPage> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     for (final d in days) ...[
-                      Text('${d['dayNumber']}. Gün',
+                      Text(t('${d['dayNumber']}. Gün', 'Day ${d['dayNumber']}'),
                           style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
                               color: Colors.teal)),
                       const SizedBox(height: 6),
                       if ((d['stops'] as List<dynamic>? ?? []).isEmpty)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.only(bottom: 8),
-                          child: Text('Henüz durak yok'),
+                          child: Text(t('Henüz durak yok', 'No stops yet')),
                         ),
                       ..._stopCards(d),
                       Align(
@@ -815,7 +833,7 @@ class _TripDetailPageState extends State<TripDetailPage> {
                         child: TextButton.icon(
                           onPressed: () => _addStop(d['dayNumber'] as int),
                           icon: const Icon(Icons.add_location_alt_outlined),
-                          label: const Text('Durak ekle'),
+                          label: Text(t('Durak ekle', 'Add stop')),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -844,17 +862,17 @@ class _TripDetailPageState extends State<TripDetailPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                tooltip: 'Yukarı',
+                tooltip: t('Yukarı', 'Up'),
                 icon: const Icon(Icons.arrow_upward),
                 onPressed: isFirst ? null : () => _move(s['id'], dayNumber, i),
               ),
               IconButton(
-                tooltip: 'Aşağı',
+                tooltip: t('Aşağı', 'Down'),
                 icon: const Icon(Icons.arrow_downward),
                 onPressed: isLast ? null : () => _move(s['id'], dayNumber, i + 2),
               ),
               IconButton(
-                tooltip: 'Sil',
+                tooltip: t('Sil', 'Delete'),
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => _delete(s['id']),
               ),
@@ -887,8 +905,8 @@ class AiGuidePage extends StatefulWidget {
 }
 
 class _AiGuidePageState extends State<AiGuidePage> {
-  final _city = TextEditingController(text: 'Roma');
-  final _country = TextEditingController(text: 'İtalya');
+  final _city = TextEditingController(text: cityn('Roma'));
+  final _country = TextEditingController(text: cn('İtalya'));
   List<_GuideLine>? _lines;
   String _genCity = '';
   String _genCountry = '';
@@ -933,11 +951,15 @@ class _AiGuidePageState extends State<AiGuidePage> {
               clean.startsWith('Mutlaka') ||
               clean.startsWith('Ne yenir') ||
               clean.startsWith('İpucu') ||
-              clean.startsWith('Ipucu'));
+              clean.startsWith('Ipucu') ||
+              clean.startsWith('Overview') ||
+              clean.startsWith('Must') ||
+              clean.startsWith('What to eat') ||
+              clean.startsWith('Tips'));
       if (isHeader) {
-        if (clean.startsWith('Mutlaka')) {
+        if (clean.startsWith('Mutlaka') || clean.startsWith('Must')) {
           section = 'PLACE';
-        } else if (clean.startsWith('Ne yenir')) {
+        } else if (clean.startsWith('Ne yenir') || clean.startsWith('What to eat')) {
           section = 'FOOD';
         } else {
           section = '';
@@ -970,7 +992,7 @@ class _AiGuidePageState extends State<AiGuidePage> {
     final city = _city.text.trim();
     final country = _country.text.trim();
     if (city.isEmpty || country.isEmpty) {
-      setState(() => _error = 'Şehir ve ülke yaz.');
+      setState(() => _error = t('Şehir ve ülke yaz.', 'Enter a city and a country.'));
       return;
     }
     setState(() {
@@ -979,12 +1001,19 @@ class _AiGuidePageState extends State<AiGuidePage> {
       _lines = null;
       _favIds.clear();
     });
-    final prompt = '$city, $country için kısa bir gezi rehberi hazırla. '
-        'Türkçe yaz. Markdown işaretleri (#, *, **) kullanma, düz metin yaz. '
-        'Şu başlıkları kullan, her başlık kendi satırında olsun: '
-        'Kısaca, Mutlaka gör (4-5 yer, her biri ayrı satırda, "Yer adı - tek cümle" biçiminde), '
-        'Ne yenir (3-4 yemek, her biri ayrı satırda, "Yemek adı - tek cümle" biçiminde), '
-        'İpucu (2-3 pratik öneri).';
+    final prompt = appLang.value == 'en'
+        ? 'Write a short travel guide for $city, $country. '
+            'Write in English. Do not use markdown symbols (#, *, **), plain text only. '
+            'Use these headings, each on its own line: '
+            'Overview, Must-see (4-5 places, each on its own line, as "Place name - one sentence"), '
+            'What to eat (3-4 dishes, each on its own line, as "Dish name - one sentence"), '
+            'Tips (2-3 practical tips).'
+        : '$city, $country için kısa bir gezi rehberi hazırla. '
+            'Türkçe yaz. Markdown işaretleri (#, *, **) kullanma, düz metin yaz. '
+            'Şu başlıkları kullan, her başlık kendi satırında olsun: '
+            'Kısaca, Mutlaka gör (4-5 yer, her biri ayrı satırda, "Yer adı - tek cümle" biçiminde), '
+            'Ne yenir (3-4 yemek, her biri ayrı satırda, "Yemek adı - tek cümle" biçiminde), '
+            'İpucu (2-3 pratik öneri).';
     try {
       final res = await http
           .post(
@@ -1002,10 +1031,10 @@ class _AiGuidePageState extends State<AiGuidePage> {
           _lines = _parse(_extractText(body));
         });
       } else {
-        setState(() => _error = 'Rehber alınamadı (${res.statusCode})');
+        setState(() => _error = t('Rehber alınamadı (${res.statusCode})', 'Could not get the guide (${res.statusCode})'));
       }
     } catch (e) {
-      setState(() => _error = 'Rehber alınamadı. Backend açık mı? ($e)');
+      setState(() => _error = t('Rehber alınamadı. Backend açık mı? ($e)', 'Could not get the guide. Is the backend running? ($e)'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1027,7 +1056,7 @@ class _AiGuidePageState extends State<AiGuidePage> {
         if (res.statusCode == 200 || res.statusCode == 204) {
           setState(() => _favIds.remove(key));
         } else {
-          _msg('Kaldırılamadı (${res.statusCode})');
+          _msg(t('Kaldırılamadı (${res.statusCode})', 'Could not remove (${res.statusCode})'));
         }
       } else {
         final res = await http.post(
@@ -1044,11 +1073,11 @@ class _AiGuidePageState extends State<AiGuidePage> {
           final body = jsonDecode(utf8.decode(res.bodyBytes));
           setState(() => _favIds[key] = body['id']);
         } else {
-          _msg('Favoriye eklenemedi (${res.statusCode})');
+          _msg(t('Favoriye eklenemedi (${res.statusCode})', 'Could not add to favorites (${res.statusCode})'));
         }
       }
     } catch (e) {
-      _msg('Sunucuya ulaşılamadı');
+      _msg(t('Sunucuya ulaşılamadı', 'Could not reach the server'));
     }
   }
 
@@ -1060,23 +1089,23 @@ class _AiGuidePageState extends State<AiGuidePage> {
         headers: authHeaders(),
       );
       if (res.statusCode != 200) {
-        _msg('Geziler alınamadı (${res.statusCode})');
+        _msg(t('Geziler alınamadı (${res.statusCode})', 'Could not load trips (${res.statusCode})'));
         return;
       }
       trips = jsonDecode(utf8.decode(res.bodyBytes)) as List<dynamic>;
     } catch (e) {
-      _msg('Sunucuya ulaşılamadı');
+      _msg(t('Sunucuya ulaşılamadı', 'Could not reach the server'));
       return;
     }
     if (trips.isEmpty) {
-      _msg('Önce Seyahatlerim ekranından bir gezi oluştur.');
+      _msg(t('Önce Seyahatlerim ekranından bir gezi oluştur.', 'First create a trip from the My trips screen.'));
       return;
     }
     if (!mounted) return;
     final trip = await showDialog<dynamic>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Hangi geziye eklensin?'),
+        title: Text(t('Hangi geziye eklensin?', 'Add to which trip?')),
         children: [
           for (final t in trips)
             SimpleDialogOption(
@@ -1091,12 +1120,12 @@ class _AiGuidePageState extends State<AiGuidePage> {
     final day = await showDialog<int>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Hangi güne?'),
+        title: Text(t('Hangi güne?', 'Which day?')),
         children: [
           for (var d = 1; d <= dayCount; d++)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, d),
-              child: Text('$d. gün'),
+              child: Text(t('$d. gün', 'Day $d')),
             ),
         ],
       ),
@@ -1115,19 +1144,19 @@ class _AiGuidePageState extends State<AiGuidePage> {
         }),
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
-        _msg('"$name" ${trip['title']} gezisinin $day. gününe eklendi.');
+        _msg(t('"$name" ${trip['title']} gezisinin $day. gününe eklendi.', '"$name" added to day $day of ${trip['title']}.'));
       } else {
-        _msg('Eklenemedi (${res.statusCode})');
+        _msg(t('Eklenemedi (${res.statusCode})', 'Could not add (${res.statusCode})'));
       }
     } catch (e) {
-      _msg('Sunucuya ulaşılamadı');
+      _msg(t('Sunucuya ulaşılamadı', 'Could not reach the server'));
     }
   }
 
   Widget _favButton(String type, String name) {
     final isFav = _favIds.containsKey('$type|$name');
     return IconButton(
-      tooltip: isFav ? 'Favoriden çıkar' : 'Favorilere ekle',
+      tooltip: isFav ? t('Favoriden çıkar', 'Remove from favorites') : t('Favorilere ekle', 'Add to favorites'),
       icon: Icon(isFav ? Icons.favorite : Icons.favorite_border,
           color: isFav ? Colors.red : null),
       onPressed: () => _toggleFav(type, name),
@@ -1139,14 +1168,14 @@ class _AiGuidePageState extends State<AiGuidePage> {
       children: [
         TextField(
           controller: _city,
-          decoration: const InputDecoration(
-              labelText: 'Şehir', prefixIcon: Icon(Icons.location_city)),
+          decoration: InputDecoration(
+              labelText: t('Şehir', 'City'), prefixIcon: Icon(Icons.location_city)),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _country,
-          decoration: const InputDecoration(
-              labelText: 'Ülke', prefixIcon: Icon(Icons.flag_outlined)),
+          decoration: InputDecoration(
+              labelText: t('Ülke', 'Country'), prefixIcon: Icon(Icons.flag_outlined)),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1155,7 +1184,7 @@ class _AiGuidePageState extends State<AiGuidePage> {
           child: FilledButton.icon(
             onPressed: _loading ? null : _generate,
             icon: const Icon(Icons.auto_awesome),
-            label: Text(_loading ? 'Rehber hazırlanıyor...' : 'Rehber oluştur'),
+            label: Text(_loading ? t('Rehber hazırlanıyor...', 'Preparing guide...') : t('Rehber oluştur', 'Create guide')),
           ),
         ),
       ],
@@ -1163,9 +1192,11 @@ class _AiGuidePageState extends State<AiGuidePage> {
   }
 
   IconData _sectionIcon(String header) {
-    if (header.startsWith('Mutlaka')) return Icons.place_outlined;
-    if (header.startsWith('Ne yenir')) return Icons.restaurant_outlined;
-    if (header.startsWith('İpucu') || header.startsWith('Ipucu')) {
+    if (header.startsWith('Mutlaka') || header.startsWith('Must')) return Icons.place_outlined;
+    if (header.startsWith('Ne yenir') || header.startsWith('What to eat')) {
+      return Icons.restaurant_outlined;
+    }
+    if (header.startsWith('İpucu') || header.startsWith('Ipucu') || header.startsWith('Tips')) {
       return Icons.lightbulb_outline;
     }
     return Icons.info_outline;
@@ -1204,7 +1235,7 @@ class _AiGuidePageState extends State<AiGuidePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                tooltip: 'Gezime ekle',
+                tooltip: t('Gezime ekle', 'Add to my trip'),
                 icon: const Icon(Icons.add_location_alt_outlined),
                 onPressed: () => _addToTrip(l.favName!, l.note),
               ),
@@ -1274,7 +1305,7 @@ class _AiGuidePageState extends State<AiGuidePage> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Yapay zekâ rehberi')),
+      appBar: AppBar(title: Text(t('Yapay zekâ rehberi', 'AI guide'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -1307,8 +1338,8 @@ class _AiGuidePageState extends State<AiGuidePage> {
                     color: _favIds.containsKey('CITY|$_genCity') ? Colors.red : null,
                   ),
                   label: Text(_favIds.containsKey('CITY|$_genCity')
-                      ? 'Favoride'
-                      : 'Şehri favorile'),
+                      ? t('Favoride', 'In favorites')
+                      : t('Şehri favorile', 'Favorite this city')),
                 ),
               ],
             ),
@@ -1337,7 +1368,7 @@ class _AiGuidePageState extends State<AiGuidePage> {
                 shape: const Border(),
                 collapsedShape: const Border(),
                 leading: const Icon(Icons.travel_explore),
-                title: const Text('Başka şehir ara'),
+                title: Text(t('Başka şehir ara', 'Search another city')),
                 childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 children: [_form()],
               ),
@@ -1380,12 +1411,12 @@ class _FavoritesPageState extends State<FavoritesPage> {
   String? _error;
   String _filter = 'ALL';
 
-  static const _labels = {
-    'PLACE': 'Yer',
-    'FOOD': 'Yemek',
-    'RESTAURANT': 'Restoran',
-    'CITY': 'Şehir',
-  };
+  Map<String, String> get _labels => {
+        'PLACE': t('Yer', 'Place'),
+        'FOOD': t('Yemek', 'Food'),
+        'RESTAURANT': t('Restoran', 'Restaurant'),
+        'CITY': t('Şehir', 'City'),
+      };
 
   @override
   void initState() {
@@ -1410,14 +1441,14 @@ class _FavoritesPageState extends State<FavoritesPage> {
         if (!mounted) return;
         setState(() {
           _loading = false;
-          _error = 'Liste alınamadı (${res.statusCode})';
+          _error = t('Liste alınamadı (${res.statusCode})', 'Could not load the list (${res.statusCode})');
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Sunucuya ulaşılamadı';
+        _error = t('Sunucuya ulaşılamadı', 'Could not reach the server');
       });
     }
   }
@@ -1439,7 +1470,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         : _items.where((f) => f['type'] == _filter).toList();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Favorilerim'),
+        title: Text(t('Favorilerim', 'My favorites')),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)],
       ),
       body: _loading
@@ -1454,11 +1485,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       child: Row(
                         children: [
                           for (final e in {
-                            'ALL': 'Tümü',
-                            'PLACE': 'Yerler',
-                            'FOOD': 'Yemekler',
-                            'RESTAURANT': 'Restoranlar',
-                            'CITY': 'Şehirler',
+                            'ALL': t('Tümü', 'All'),
+                            'PLACE': t('Yerler', 'Places'),
+                            'FOOD': t('Yemekler', 'Foods'),
+                            'RESTAURANT': t('Restoranlar', 'Restaurants'),
+                            'CITY': t('Şehirler', 'Cities'),
                           }.entries)
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
@@ -1473,7 +1504,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                     ),
                     Expanded(
                       child: shown.isEmpty
-                          ? const Center(child: Text('Henüz favori yok.'))
+                          ? Center(child: Text(t('Henüz favori yok.', 'No favorites yet.')))
                           : ListView.builder(
                               itemCount: shown.length,
                               itemBuilder: (context, i) {
@@ -1484,7 +1515,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                                   title: Text('${f['name']}'),
                                   subtitle: Text('$label · ${f['city']}, ${f['country']}'),
                                   trailing: IconButton(
-                                    tooltip: 'Kaldır',
+                                    tooltip: t('Kaldır', 'Remove'),
                                     icon: const Icon(Icons.delete_outline),
                                     onPressed: () => _delete(f['id']),
                                   ),

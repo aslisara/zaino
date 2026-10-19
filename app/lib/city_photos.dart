@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'l10n.dart';
 import 'package:http/http.dart' as http;
 
 /// Şehir fotoğrafları: Vikipedi'nin açık API'sinden (anahtar gerekmez) alınır.
@@ -154,7 +155,7 @@ class _CityPhotosState extends State<CityPhotos> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Fotoğraflar: Vikipedi / Wikimedia Commons',
+              t('Fotoğraflar: Vikipedi / Wikimedia Commons', 'Photos: Wikipedia / Wikimedia Commons'),
               style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
