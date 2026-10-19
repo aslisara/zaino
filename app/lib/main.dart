@@ -350,6 +350,45 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Future<void> _deleteAccount() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('Hesabı sil', 'Delete account')),
+        content: Text(t(
+            'Hesabın ve tüm verilerin (gezilerin, favorilerin, stickerların) kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+            'Your account and all your data (trips, favorites, stickers) will be permanently deleted. This cannot be undone.')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Vazgeç', 'Cancel'))),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+                foregroundColor: Theme.of(ctx).colorScheme.onError),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t('Sil', 'Delete')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final res = await http
+          .delete(Uri.parse('$baseUrl/api/me'), headers: authHeaders())
+          .timeout(const Duration(seconds: 60));
+      if (!mounted) return;
+      if (res.statusCode == 200 || res.statusCode == 204) {
+        _logout();
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('Hesap silinemedi (${res.statusCode})', 'Could not delete the account (${res.statusCode})'))));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('Hesap silinemedi, bağlantını kontrol et.', 'Could not delete the account, check your connection.'))));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -451,6 +490,12 @@ class _ProfilePageState extends State<ProfilePage> {
             onPressed: _logout,
             icon: const Icon(Icons.logout),
             label: Text(t('Çıkış yap', 'Log out')),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _deleteAccount,
+            icon: Icon(Icons.delete_forever, color: cs.error),
+            label: Text(t('Hesabımı sil', 'Delete my account'), style: TextStyle(color: cs.error)),
           ),
           const SizedBox(height: 24),
           Center(
