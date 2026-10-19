@@ -2,8 +2,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'ai_plan.dart';
 import 'city_photos.dart';
 import 'explore.dart';
+import 'l10n.dart';
+import 'trip_map.dart';
+import 'trip_share.dart';
+import 'weather.dart';
 
 final String baseUrl = kIsWeb ? 'http://localhost:8080' : 'http://10.0.2.2:8080';
 String? authToken;
@@ -15,20 +20,51 @@ Map<String, String> authHeaders() => {
 
 void main() => runApp(const ExploreApp());
 
+/// Açık / koyu / sistem teması (Profil sekmesinden değişir).
+final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
+
+ThemeData _buildTheme(Brightness brightness) {
+  final cs = ColorScheme.fromSeed(
+    seedColor: const Color(0xFF00897B),
+    brightness: brightness,
+  );
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: cs,
+    appBarTheme: const AppBarTheme(centerTitle: false),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+    chipTheme: ChipThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+  );
+}
+
 class ExploreApp extends StatelessWidget {
   const ExploreApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Explore World',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
-      home: const LoginPage(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeMode,
+      builder: (_, mode, __) => MaterialApp(
+        title: 'Explore World',
+        debugShowCheckedModeBanner: false,
+        theme: _buildTheme(Brightness.light),
+        darkTheme: _buildTheme(Brightness.dark),
+        themeMode: mode,
+        home: const LoginPage(),
+      ),
     );
   }
 }
 
-// ---------------- GİRİŞ ----------------
+// ---------------- GİRİŞ / KAYIT ----------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
   @override
@@ -38,15 +74,43 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController(text: 'test@test.com');
   final _password = TextEditingController(text: '12345678');
+  final _name = TextEditingController();
+  bool _register = false;
   String? _error;
   bool _loading = false;
 
-  Future<void> _login() async {
+  String _errorFrom(http.Response res, String fallback) {
+    try {
+      final j = jsonDecode(utf8.decode(res.bodyBytes));
+      if (j is Map) {
+        final m = j['message'] ?? j['error'] ?? j['detail'];
+        if (m is String && m.isNotEmpty) return m;
+      }
+    } catch (_) {}
+    return '$fallback (${res.statusCode})';
+  }
+
+  Future<void> _submit() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
+      if (_register) {
+        final r = await http.post(
+          Uri.parse('$baseUrl/api/auth/register'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'email': _email.text.trim(),
+            'password': _password.text,
+            'displayName': _name.text.trim(),
+          }),
+        );
+        if (r.statusCode != 200 && r.statusCode != 201) {
+          setState(() => _error = _errorFrom(r, 'Kayıt başarısız'));
+          return;
+        }
+      }
       final res = await http.post(
         Uri.parse('$baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -56,9 +120,9 @@ class _LoginPageState extends State<LoginPage> {
         authToken = jsonDecode(res.body)['token'];
         if (!mounted) return;
         Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const HomePage()));
+            context, MaterialPageRoute(builder: (_) => const MainShell()));
       } else {
-        setState(() => _error = 'Giriş başarısız (${res.statusCode})');
+        setState(() => _error = _errorFrom(res, 'Giriş başarısız'));
       }
     } catch (e) {
       setState(() => _error = 'Sunucuya ulaşılamadı');
@@ -69,45 +133,263 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.public, size: 64, color: Colors.teal),
-                const SizedBox(height: 8),
-                const Text('Explore World',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 24),
-                TextField(
-                    controller: _email,
-                    decoration: const InputDecoration(
-                        labelText: 'E-posta', border: OutlineInputBorder())),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: _password,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                        labelText: 'Şifre', border: OutlineInputBorder())),
-                const SizedBox(height: 12),
-                if (_error != null)
-                  Text(_error!, style: const TextStyle(color: Colors.red)),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _loading ? null : _login,
-                    child: Text(_loading ? 'Bekleyin...' : 'Giriş yap'),
-                  ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [cs.primaryContainer, cs.surface],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const MiniGlobe(size: 190),
+                    const SizedBox(height: 8),
+                    Text('Explore World',
+                        style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('Yapay zekâ destekli seyahat rehberin',
+                        style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                    const SizedBox(height: 24),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            if (_register) ...[
+                              TextField(
+                                controller: _name,
+                                decoration: const InputDecoration(
+                                  labelText: 'Adın',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            TextField(
+                              controller: _email,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: const InputDecoration(
+                                labelText: 'E-posta',
+                                prefixIcon: Icon(Icons.mail_outline),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _password,
+                              obscureText: true,
+                              onSubmitted: (_) => _loading ? null : _submit(),
+                              decoration: const InputDecoration(
+                                labelText: 'Şifre',
+                                prefixIcon: Icon(Icons.lock_outline),
+                              ),
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 12),
+                              Text(_error!, style: TextStyle(color: cs.error)),
+                            ],
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: FilledButton(
+                                onPressed: _loading ? null : _submit,
+                                child: Text(_loading
+                                    ? 'Bekleyin...'
+                                    : (_register ? 'Kayıt ol' : 'Giriş yap')),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _loading
+                                  ? null
+                                  : () => setState(() {
+                                        _register = !_register;
+                                        _error = null;
+                                      }),
+                              child: Text(_register
+                                  ? 'Hesabın var mı? Giriş yap'
+                                  : 'Hesabın yok mu? Kayıt ol'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ---------------- ANA KABUK (ALT MENÜ) ----------------
+class MainShell extends StatefulWidget {
+  const MainShell({super.key});
+  @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  int _tab = 0;
+  int _favGen = 0;
+  int _tripGen = 0;
+
+  void _select(int i) {
+    setState(() {
+      if (i == 1) _favGen++; // sekmeye her girişte liste yenilensin
+      if (i == 2) _tripGen++;
+      _tab = i;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _tab,
+        children: [
+          const ExplorePage(),
+          FavoritesPage(key: ValueKey('fav$_favGen')),
+          HomePage(key: ValueKey('trips$_tripGen')),
+          const ProfilePage(),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: _select,
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.public_outlined),
+              selectedIcon: Icon(Icons.public),
+              label: 'Keşfet'),
+          NavigationDestination(
+              icon: Icon(Icons.favorite_border),
+              selectedIcon: Icon(Icons.favorite),
+              label: 'Favoriler'),
+          NavigationDestination(
+              icon: Icon(Icons.luggage_outlined),
+              selectedIcon: Icon(Icons.luggage),
+              label: 'Seyahatlerim'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profil'),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------- PROFİL ----------------
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  Map<String, dynamic>? _me;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/me'), headers: authHeaders());
+      if (res.statusCode == 200) {
+        final j = jsonDecode(utf8.decode(res.bodyBytes));
+        if (j is Map<String, dynamic> && mounted) setState(() => _me = j);
+      }
+    } catch (_) {}
+  }
+
+  void _logout() {
+    authToken = null;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final name = '${_me?['displayName'] ?? _me?['name'] ?? 'Gezgin'}';
+    final email = '${_me?['email'] ?? ''}';
+    final initial = name.isNotEmpty ? name.characters.first.toUpperCase() : '?';
+    return Scaffold(
+      appBar: AppBar(title: const Text('Profil')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const SizedBox(height: 8),
+          Center(
+            child: CircleAvatar(
+              radius: 44,
+              backgroundColor: cs.primaryContainer,
+              child: Text(initial,
+                  style: tt.displaySmall?.copyWith(color: cs.onPrimaryContainer)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(child: Text(name, style: tt.titleLarge)),
+          if (email.isNotEmpty)
+            Center(
+              child: Text(email, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            ),
+          const SizedBox(height: 28),
+          Text('Görünüm', style: tt.titleSmall),
+          const SizedBox(height: 8),
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeMode,
+            builder: (_, mode, __) => SegmentedButton<ThemeMode>(
+              segments: const [
+                ButtonSegment(
+                    value: ThemeMode.system,
+                    icon: Icon(Icons.brightness_auto),
+                    label: Text('Sistem')),
+                ButtonSegment(
+                    value: ThemeMode.light,
+                    icon: Icon(Icons.light_mode),
+                    label: Text('Açık')),
+                ButtonSegment(
+                    value: ThemeMode.dark,
+                    icon: Icon(Icons.dark_mode),
+                    label: Text('Koyu')),
+              ],
+              selected: {mode},
+              onSelectionChanged: (s) => themeMode.value = s.first,
+            ),
+          ),
+          const SizedBox(height: 28),
+          OutlinedButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Çıkış yap'),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: Text('Explore World · yapay zekâ destekli seyahat rehberi',
+                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+          ),
+        ],
       ),
     );
   }
@@ -183,35 +465,16 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Seyahatlerim'),
         actions: [
           IconButton(
-            tooltip: 'Keşfet',
-            icon: const Icon(Icons.public),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ExplorePage()),
-            ),
+            tooltip: 'Yenile',
+            icon: const Icon(Icons.refresh),
+            onPressed: _load,
           ),
-          IconButton(
-            tooltip: 'Favoriler',
-            icon: const Icon(Icons.favorite_border),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FavoritesPage()),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Yapay zekâ rehberi',
-            icon: const Icon(Icons.auto_awesome),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AiGuidePage()),
-            ),
-          ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -226,24 +489,41 @@ class _HomePageState extends State<HomePage> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: _trips.isEmpty
-                      ? ListView(children: const [
-                          SizedBox(height: 120),
-                          Center(child: Text('Henüz gezin yok. + ile ekle.')),
+                      ? ListView(children: [
+                          const SizedBox(height: 120),
+                          Icon(Icons.luggage_outlined, size: 64, color: cs.outline),
+                          const SizedBox(height: 12),
+                          const Center(child: Text('Henüz gezin yok.')),
+                          const SizedBox(height: 4),
+                          const Center(child: Text('Aşağıdaki "Yeni gezi" düğmesiyle başla.')),
                         ])
                       : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                           itemCount: _trips.length,
                           itemBuilder: (context, i) {
                             final t = _trips[i];
-                            return ListTile(
-                              leading: const Icon(Icons.luggage),
-                              title: Text('${t['title'] ?? ''}'),
-                              subtitle: Text(
-                                  '${t['city'] ?? ''}, ${t['country'] ?? ''} · ${t['dayCount'] ?? '?'} gün'),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => TripDetailPage(tripId: t['id'])),
+                            final days = (t['days'] is List)
+                                ? (t['days'] as List).length
+                                : (t['dayCount'] ?? '?');
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 6),
+                              child: ListTile(
+                                contentPadding:
+                                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                leading: CircleAvatar(
+                                  backgroundColor: cs.primaryContainer,
+                                  child: Icon(Icons.luggage, color: cs.onPrimaryContainer),
+                                ),
+                                title: Text('${t['title'] ?? ''}',
+                                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                                subtitle: Text(
+                                    '${t['city'] ?? ''}, ${t['country'] ?? ''} · $days gün'),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => TripDetailPage(tripId: t['id'])),
+                                ),
                               ),
                             );
                           },
@@ -490,7 +770,26 @@ class _TripDetailPageState extends State<TripDetailPage> {
   Widget build(BuildContext context) {
     final days = (_trip?['days'] as List<dynamic>?) ?? [];
     return Scaffold(
-      appBar: AppBar(title: Text('${_trip?['title'] ?? 'Gezi'}')),
+      appBar: AppBar(
+        title: Text('${_trip?['title'] ?? 'Gezi'}'),
+        actions: [
+          if (_trip != null)
+            IconButton(
+              tooltip: t('Haritada gör', 'View on map'),
+              icon: const Icon(Icons.map_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => TripMapPage(trip: _trip!)),
+              ),
+            ),
+          if (_trip != null)
+            IconButton(
+              tooltip: t('Paylaş', 'Share'),
+              icon: const Icon(Icons.share_outlined),
+              onPressed: () => shareTrip(context, _trip!),
+            ),
+        ],
+      ),
       body: _error != null
           ? Center(child: Text(_error!))
           : _trip == null
@@ -835,13 +1134,149 @@ class _AiGuidePageState extends State<AiGuidePage> {
     );
   }
 
+  Widget _form() {
+    return Column(
+      children: [
+        TextField(
+          controller: _city,
+          decoration: const InputDecoration(
+              labelText: 'Şehir', prefixIcon: Icon(Icons.location_city)),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _country,
+          decoration: const InputDecoration(
+              labelText: 'Ülke', prefixIcon: Icon(Icons.flag_outlined)),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton.icon(
+            onPressed: _loading ? null : _generate,
+            icon: const Icon(Icons.auto_awesome),
+            label: Text(_loading ? 'Rehber hazırlanıyor...' : 'Rehber oluştur'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  IconData _sectionIcon(String header) {
+    if (header.startsWith('Mutlaka')) return Icons.place_outlined;
+    if (header.startsWith('Ne yenir')) return Icons.restaurant_outlined;
+    if (header.startsWith('İpucu') || header.startsWith('Ipucu')) {
+      return Icons.lightbulb_outline;
+    }
+    return Icons.info_outline;
+  }
+
+  Widget _lineRow(_GuideLine l, ColorScheme cs) {
+    if (l.favType == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: SelectableText(l.text, style: const TextStyle(fontSize: 15, height: 1.45)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SelectableText.rich(
+                TextSpan(
+                  style: const TextStyle(fontSize: 15, height: 1.45),
+                  children: [
+                    TextSpan(
+                      text: l.favName,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    if (l.note != null) TextSpan(text: ' — ${l.note}'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Gezime ekle',
+                icon: const Icon(Icons.add_location_alt_outlined),
+                onPressed: () => _addToTrip(l.favName!, l.note),
+              ),
+              _favButton(l.favType!, l.favName!),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _sections(List<_GuideLine> lines, ColorScheme cs) {
+    final cards = <Widget>[];
+    String? header;
+    var items = <_GuideLine>[];
+
+    void flush() {
+      if (header == null && items.isEmpty) return;
+      cards.add(
+        Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (header != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4, right: 8),
+                    child: Row(
+                      children: [
+                        Icon(_sectionIcon(header!), color: cs.primary),
+                        const SizedBox(width: 8),
+                        Text(header!,
+                            style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: cs.primary)),
+                      ],
+                    ),
+                  ),
+                for (final l in items) _lineRow(l, cs),
+              ],
+            ),
+          ),
+        ),
+      );
+      header = null;
+      items = <_GuideLine>[];
+    }
+
+    for (final l in lines) {
+      if (l.isHeader) {
+        flush();
+        header = l.text;
+      } else {
+        items.add(l);
+      }
+    }
+    flush();
+    return cards;
+  }
+
   @override
   Widget build(BuildContext context) {
     final lines = _lines;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Yapay zekâ rehberi')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
           if (lines != null) ...[
             CityPhotos(
@@ -850,35 +1285,20 @@ class _AiGuidePageState extends State<AiGuidePage> {
               country: _genCountry,
             ),
             const SizedBox(height: 16),
-          ],
-          TextField(
-              controller: _city,
-              decoration: const InputDecoration(
-                  labelText: 'Şehir', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          TextField(
-              controller: _country,
-              decoration: const InputDecoration(
-                  labelText: 'Ülke', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _loading ? null : _generate,
-            icon: const Icon(Icons.auto_awesome),
-            label: Text(_loading ? 'Rehber hazırlanıyor...' : 'Rehber oluştur'),
-          ),
-          const SizedBox(height: 16),
-          if (_loading) const Center(child: CircularProgressIndicator()),
-          if (_error != null)
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-          if (lines != null) ...[
             Row(
               children: [
                 Expanded(
-                  child: Text('$_genCity, $_genCountry',
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.w600)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_genCity,
+                          style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(_genCountry,
+                          style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                    ],
+                  ),
                 ),
-                OutlinedButton.icon(
+                FilledButton.tonalIcon(
                   onPressed: () => _toggleFav('CITY', _genCity),
                   icon: Icon(
                     _favIds.containsKey('CITY|$_genCity')
@@ -886,62 +1306,61 @@ class _AiGuidePageState extends State<AiGuidePage> {
                         : Icons.favorite_border,
                     color: _favIds.containsKey('CITY|$_genCity') ? Colors.red : null,
                   ),
-                  label: const Text('Şehri favorile'),
+                  label: Text(_favIds.containsKey('CITY|$_genCity')
+                      ? 'Favoride'
+                      : 'Şehri favorile'),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            WeatherCard(
+              key: ValueKey('w$_genCity|$_genCountry'),
+              city: _genCity,
+              country: _genCountry,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
+                onPressed: () => planTripWithAi(context, _genCity, _genCountry),
+                icon: const Icon(Icons.auto_awesome_motion),
+                label: Text(t('Bu şehir için gezi planı oluştur',
+                    'Create a trip plan for this city')),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ..._sections(lines, cs),
             Card(
+              margin: EdgeInsets.zero,
+              child: ExpansionTile(
+                shape: const Border(),
+                collapsedShape: const Border(),
+                leading: const Icon(Icons.travel_explore),
+                title: const Text('Başka şehir ara'),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                children: [_form()],
+              ),
+            ),
+          ] else ...[
+            Card(
+              margin: EdgeInsets.zero,
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final l in lines)
-                      if (l.isHeader)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 4),
-                          child: Text(l.text,
-                              style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.teal)),
-                        )
-                      else if (l.favType != null)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: SelectableText(l.text,
-                                    style: const TextStyle(fontSize: 15, height: 1.4)),
-                              ),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Gezime ekle',
-                                  icon: const Icon(Icons.add_location_alt_outlined),
-                                  onPressed: () => _addToTrip(l.favName!, l.note),
-                                ),
-                                _favButton(l.favType!, l.favName!),
-                              ],
-                            ),
-                          ],
-                        )
-                      else
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
-                          child: SelectableText(l.text,
-                              style: const TextStyle(fontSize: 15, height: 1.4)),
-                        ),
-                  ],
-                ),
+                child: _form(),
               ),
             ),
           ],
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(_error!, style: TextStyle(color: cs.error)),
+            ),
         ],
       ),
     );

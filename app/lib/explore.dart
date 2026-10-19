@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart' show PointerScrollEvent;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+import 'l10n.dart';
 import 'main.dart' show AiGuidePage, baseUrl, authHeaders;
 import 'world_data.dart';
 
@@ -234,6 +236,9 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
   String? _moreError;
   final _cityInput = TextEditingController();
   final Map<String, List<List<double>>?> _shapeCache = {};
+  final Map<String, Map<String, dynamic>> _culture = {}; // ülke -> {book, song}
+  String? _loadingCulture;
+  String? _cultureError;
 
   /// Seçili ülkenin sınır şekli (küçük ada ülkelerinde yoktur).
   List<List<double>>? _shapeFor(Country? c) {
@@ -365,6 +370,56 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
     }
   }
 
+  Future<void> _loadCulture(Country c) async {
+    setState(() {
+      _loadingCulture = c.name;
+      _cultureError = null;
+    });
+    try {
+      final lang = appLang.value == 'en' ? 'English' : 'Turkish';
+      final prompt = 'Recommend one well-known REAL book (novel or non-fiction) and one '
+          'well-known REAL song that represent or relate to ${c.name}. '
+          'Answer ONLY with valid JSON, no markdown: '
+          '{"book":{"title":"","author":"","why":"max 12 words"},'
+          '"song":{"title":"","artist":"","why":"max 12 words"}}. '
+          'Keep original titles. Write "why" in $lang.';
+      final res = await http
+          .post(Uri.parse('$baseUrl/api/ai'),
+              headers: authHeaders(), body: jsonEncode({'prompt': prompt}))
+          .timeout(const Duration(seconds: 60));
+      if (res.statusCode != 200) throw Exception('${res.statusCode}');
+      final text = _extractText(jsonDecode(utf8.decode(res.bodyBytes)));
+      final a = text.indexOf('{');
+      final b = text.lastIndexOf('}');
+      final j = jsonDecode(text.substring(a, b + 1));
+      if (j is! Map || j['book'] is! Map || j['song'] is! Map) throw Exception('format');
+      if (!mounted) return;
+      setState(() => _culture[c.name] = Map<String, dynamic>.from(j));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cultureError = t('Öneri alınamadı, tekrar dene.', 'Could not get a suggestion, try again.'));
+    } finally {
+      if (mounted) setState(() => _loadingCulture = null);
+    }
+  }
+
+  Widget _cultureTile(IconData icon, String label, String title, String? why, Uri url) {
+    final cs = Theme.of(context).colorScheme;
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        radius: 18,
+        backgroundColor: cs.primaryContainer,
+        child: Icon(icon, size: 18, color: cs.onPrimaryContainer),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text([label, if (why != null && why.isNotEmpty) why].join(' · ')),
+      trailing: const Icon(Icons.open_in_new, size: 18),
+      onTap: () => launchUrl(url, mode: LaunchMode.externalApplication),
+    );
+  }
+
   void _openGuide(Country c, String city) {
     Navigator.push(
       context,
@@ -399,7 +454,19 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
         .toList()
       ..sort((a, b) => _fold(a.name).compareTo(_fold(b.name)));
     return Scaffold(
-      appBar: AppBar(title: const Text('Keşfet')),
+      appBar: AppBar(
+        title: const Text('Keşfet'),
+        actions: [
+          IconButton(
+            tooltip: 'Yapay zekâ rehberi',
+            icon: const Icon(Icons.auto_awesome),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AiGuidePage()),
+            ),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -501,6 +568,42 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
                             ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      if (_culture[sel.name] != null) ...[
+                        _cultureTile(
+                          Icons.menu_book,
+                          t('Kitap', 'Book'),
+                          '${_culture[sel.name]!['book']['title']} — ${_culture[sel.name]!['book']['author']}',
+                          '${_culture[sel.name]!['book']['why'] ?? ''}',
+                          Uri.parse('https://www.google.com/search?q=${Uri.encodeQueryComponent('${_culture[sel.name]!['book']['title']} ${_culture[sel.name]!['book']['author']} kitap')}'),
+                        ),
+                        _cultureTile(
+                          Icons.music_note,
+                          t('Şarkı', 'Song'),
+                          '${_culture[sel.name]!['song']['title']} — ${_culture[sel.name]!['song']['artist']}',
+                          '${_culture[sel.name]!['song']['why'] ?? ''}',
+                          Uri.parse('https://www.youtube.com/results?search_query=${Uri.encodeQueryComponent('${_culture[sel.name]!['song']['title']} ${_culture[sel.name]!['song']['artist']}')}'),
+                        ),
+                      ] else
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FilledButton.tonalIcon(
+                            onPressed: _loadingCulture != null ? null : () => _loadCulture(sel),
+                            icon: _loadingCulture == sel.name
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.library_music_outlined),
+                            label: Text(_loadingCulture == sel.name
+                                ? t('Hazırlanıyor...', 'Preparing...')
+                                : t('Kitap ve şarkı önerisi', 'Book and song suggestion')),
+                          ),
+                        ),
+                      if (_cultureError != null)
+                        Text(_cultureError!,
+                            style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
                       if (_moreError != null) ...[
                         const SizedBox(height: 6),
                         Text(_moreError!,
@@ -655,6 +758,8 @@ class _GlobePainter extends CustomPainter {
   final List<List<double>>? shape;
   final Color marker;
   final Color markerSel;
+  final bool background;
+  final bool showMarkers;
 
   _GlobePainter({
     required this.lon0,
@@ -664,6 +769,8 @@ class _GlobePainter extends CustomPainter {
     required this.shape,
     required this.marker,
     required this.markerSel,
+    this.background = true,
+    this.showMarkers = true,
   });
 
   static const _oceanLight = Color(0xFF3F8FD8);
@@ -680,21 +787,24 @@ class _GlobePainter extends CustomPainter {
     final full = Rect.fromLTWH(0, 0, size.width, size.height);
     final disc = Rect.fromCircle(center: c, radius: r);
 
-    // uzay arka planı
-    canvas.drawRect(
-      full,
-      Paint()
-        ..shader = const RadialGradient(
-          colors: [Color(0xFF14264D), Color(0xFF070D20)],
-        ).createShader(full),
-    );
-    // sabit yıldızlar
-    final rnd = math.Random(7);
-    final star = Paint();
-    for (var i = 0; i < 70; i++) {
-      final o = Offset(rnd.nextDouble() * size.width, rnd.nextDouble() * size.height);
-      star.color = Colors.white.withValues(alpha: 0.15 + rnd.nextDouble() * 0.5);
-      canvas.drawCircle(o, 0.4 + rnd.nextDouble() * 1.1, star);
+    if (background) {
+      // uzay arka planı
+      canvas.drawRect(
+        full,
+        Paint()
+          ..shader = const RadialGradient(
+            colors: [Color(0xFF14264D), Color(0xFF070D20)],
+          ).createShader(full),
+      );
+      // sabit yıldızlar
+      final rnd = math.Random(7);
+      final star = Paint();
+      for (var i = 0; i < 70; i++) {
+        final o = Offset(rnd.nextDouble() * size.width, rnd.nextDouble() * size.height);
+        star.color = Colors.white.withValues(alpha: 0.15 + rnd.nextDouble() * 0.5);
+        canvas.drawCircle(o, 0.4 + rnd.nextDouble() * 1.1, star);
+      }
+
     }
 
     // atmosfer parıltısı
@@ -816,7 +926,7 @@ class _GlobePainter extends CustomPainter {
 
     // ülke işaretleri
     final showAllLabels = zoom >= 2.4;
-    for (final country in kCountries) {
+    for (final country in (showMarkers ? kCountries : const <Country>[])) {
       final p = proj.project(country.lat, country.lon);
       if (p.z <= 0.05) continue;
       final isSel = identical(country, selected);
@@ -966,4 +1076,53 @@ class _GlobePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _GlobePainter old) =>
       old.lon0 != lon0 || old.lat0 != lat0 || old.zoom != zoom || old.selected != selected || !identical(old.shape, shape);
+}
+
+// ---------------- KÜÇÜK DÖNEN KÜRE (giriş ekranı için) ----------------
+class MiniGlobe extends StatefulWidget {
+  const MiniGlobe({super.key, this.size = 180});
+  final double size;
+  @override
+  State<MiniGlobe> createState() => _MiniGlobeState();
+}
+
+class _MiniGlobeState extends State<MiniGlobe> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(seconds: 50))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => CustomPaint(
+          size: Size.square(widget.size),
+          painter: _GlobePainter(
+            lon0: 20 + _c.value * 360,
+            lat0: 20,
+            zoom: 1,
+            selected: null,
+            shape: null,
+            marker: Colors.transparent,
+            markerSel: Colors.transparent,
+            background: false,
+            showMarkers: false,
+          ),
+        ),
+      ),
+    );
+  }
 }
