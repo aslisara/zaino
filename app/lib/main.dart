@@ -1,6 +1,5 @@
 import 'splash.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'ai_plan.dart';
@@ -14,7 +13,10 @@ import 'trip_map.dart';
 import 'trip_share.dart';
 import 'weather.dart';
 
-final String baseUrl = kIsWeb ? 'http://localhost:8080' : 'http://10.0.2.2:8080';
+/// Varsayılan: internetteki backend. Yerel backend ile denemek için:
+/// flutter run -d chrome --dart-define=API_URL=http://localhost:8080
+const String baseUrl =
+    String.fromEnvironment('API_URL', defaultValue: 'https://zaino.onrender.com');
 String? authToken;
 
 Map<String, String> authHeaders() => {
