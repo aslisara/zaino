@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'l10n.dart';
 import 'main.dart' show AiGuidePage, baseUrl, authHeaders;
 import 'names_en.dart';
+import 'stickers.dart';
 import 'world_data.dart';
 
 // ---------------- VERİ ----------------
@@ -244,10 +245,20 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
   /// Seçili ülkenin sınır şekli (küçük ada ülkelerinde yoktur).
   List<List<double>>? _shapeFor(Country? c) {
     if (c == null) return null;
-    return _shapeCache.putIfAbsent(c.name, () {
-      final data = kCountryShapes[c.name];
-      return data == null ? null : _parseLines(data, maxStep: 2.5);
-    });
+    return countryShape(c.name);
+  }
+
+  List<List<List<double>>> _visited = const [];
+
+  void _syncVisited() {
+    _visited = [
+      for (final n in visitedCountryNames())
+        if (countryShape(n) != null) countryShape(n)!,
+    ];
+  }
+
+  void _onStickers() {
+    if (mounted) setState(_syncVisited);
   }
 
   late final AnimationController _spin;
@@ -256,6 +267,8 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
+    _syncVisited();
+    myStickers.addListener(_onStickers);
     _spin = AnimationController(vsync: this, duration: const Duration(seconds: 1))
       ..addListener(() {
         if (_auto && mounted) setState(() => _lon0 = _wrap(_lon0 + 0.12));
@@ -265,6 +278,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
 
   @override
   void dispose() {
+    myStickers.removeListener(_onStickers);
     _spin.dispose();
     _cityInput.dispose();
     _fly?.dispose();
@@ -514,6 +528,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
                       zoom: _zoom,
                       selected: sel,
                       shape: _shapeFor(sel),
+                      visited: _visited,
                       marker: cs.tertiary,
                       markerSel: cs.error,
                     ),
@@ -575,6 +590,20 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
                               onPressed: _loadingMore != null ? null : () => _loadMore(sel),
                             ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: visitedCountryNames().contains(sel.name)
+                            ? Chip(
+                                avatar: const Icon(Icons.check_circle, size: 18),
+                                label: Text(t('Sticker koleksiyonunda', 'In your sticker collection')),
+                              )
+                            : FilledButton.icon(
+                                onPressed: () => showAddStickerDialog(context, initial: sel),
+                                icon: const Icon(Icons.add_reaction_outlined),
+                                label: Text(t('Gittim, sticker ekle', 'I have been here, add sticker')),
+                              ),
                       ),
                       const SizedBox(height: 8),
                       if (_culture[sel.name] != null) ...[
@@ -721,6 +750,16 @@ class _GlobeProjector {
 }
 
 // ---------------- GERÇEK HARİTA VERİSİ ----------------
+final Map<String, List<List<double>>?> _shapeCacheAll = {};
+
+/// Ülkenin sınır şekli (küçük ada ülkelerinde yoktur). Sticker silüetleri de bunu kullanır.
+List<List<double>>? countryShape(String name) {
+  return _shapeCacheAll.putIfAbsent(name, () {
+    final data = kCountryShapes[name];
+    return data == null ? null : _parseLines(data, maxStep: 2.5);
+  });
+}
+
 List<List<double>> _parseLines(String data, {double maxStep = 0}) {
   final out = <List<double>>[];
   for (final ring in data.split('|')) {
@@ -764,6 +803,7 @@ class _GlobePainter extends CustomPainter {
   final double zoom;
   final Country? selected;
   final List<List<double>>? shape;
+  final List<List<List<double>>> visited;
   final Color marker;
   final Color markerSel;
   final bool background;
@@ -775,6 +815,7 @@ class _GlobePainter extends CustomPainter {
     required this.zoom,
     required this.selected,
     required this.shape,
+    this.visited = const [],
     required this.marker,
     required this.markerSel,
     this.background = true,
@@ -882,6 +923,24 @@ class _GlobePainter extends CustomPainter {
       ..strokeWidth = 0.6;
     for (final line in kBorderLines) {
       _strokeFlat(canvas, proj, border, line);
+    }
+
+    // gidilen ülkeleri renklendir (sticker alınanlar)
+    if (visited.isNotEmpty) {
+      final vFill = Paint()..color = const Color(0xFF26A69A).withValues(alpha: 0.82);
+      final vEdge = Paint()
+        ..color = Colors.white.withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..strokeJoin = StrokeJoin.round;
+      for (final rings in visited) {
+        for (final ring in rings) {
+          final path = _clipRing(proj, ring);
+          if (path == null) continue;
+          canvas.drawPath(path, vFill);
+          canvas.drawPath(path, vEdge);
+        }
+      }
     }
 
     // seçili ülkeyi renklendir
@@ -1083,13 +1142,14 @@ class _GlobePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GlobePainter old) =>
-      old.lon0 != lon0 || old.lat0 != lat0 || old.zoom != zoom || old.selected != selected || !identical(old.shape, shape);
+      old.lon0 != lon0 || old.lat0 != lat0 || old.zoom != zoom || old.selected != selected || !identical(old.shape, shape) || !identical(old.visited, visited);
 }
 
 // ---------------- KÜÇÜK DÖNEN KÜRE (giriş ekranı için) ----------------
 class MiniGlobe extends StatefulWidget {
-  const MiniGlobe({super.key, this.size = 180});
+  const MiniGlobe({super.key, this.size = 180, this.seconds = 50});
   final double size;
+  final int seconds;
   @override
   State<MiniGlobe> createState() => _MiniGlobeState();
 }
@@ -1100,7 +1160,7 @@ class _MiniGlobeState extends State<MiniGlobe> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _c = AnimationController(vsync: this, duration: const Duration(seconds: 50))..repeat();
+    _c = AnimationController(vsync: this, duration: Duration(seconds: widget.seconds))..repeat();
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'splash.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import 'city_photos.dart';
 import 'explore.dart';
 import 'l10n.dart';
 import 'names_en.dart';
+import 'profile_edit.dart';
+import 'stickers.dart';
 import 'trip_map.dart';
 import 'trip_share.dart';
 import 'weather.dart';
@@ -24,9 +27,9 @@ void main() => runApp(const ExploreApp());
 /// Açık / koyu / sistem teması (Profil sekmesinden değişir).
 final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
 
-ThemeData _buildTheme(Brightness brightness) {
+ThemeData _buildTheme(Brightness brightness, Color seed) {
   final cs = ColorScheme.fromSeed(
-    seedColor: const Color(0xFF00897B),
+    seedColor: seed,
     brightness: brightness,
   );
   return ThemeData(
@@ -51,15 +54,18 @@ class ExploreApp extends StatelessWidget {
   const ExploreApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeMode,
-      builder: (_, mode, __) => MaterialApp(
-        title: 'Explore World',
-        debugShowCheckedModeBanner: false,
-        theme: _buildTheme(Brightness.light),
-        darkTheme: _buildTheme(Brightness.dark),
-        themeMode: mode,
-        home: const LoginPage(),
+    return ValueListenableBuilder<Color>(
+      valueListenable: accentColor,
+      builder: (_, seed, __) => ValueListenableBuilder<ThemeMode>(
+        valueListenable: themeMode,
+        builder: (_, mode, __) => MaterialApp(
+          title: 'Zaino',
+          debugShowCheckedModeBanner: false,
+          theme: _buildTheme(Brightness.light, seed),
+          darkTheme: _buildTheme(Brightness.dark, seed),
+          themeMode: mode,
+          home: const SplashPage(),
+        ),
       ),
     );
   }
@@ -156,7 +162,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const MiniGlobe(size: 190),
                     const SizedBox(height: 8),
-                    Text('Explore World',
+                    Text('Zaino',
                         style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
                     Text(t('Yapay zekâ destekli seyahat rehberin', 'Your AI-powered travel guide'),
@@ -248,6 +254,13 @@ class _MainShellState extends State<MainShell> {
   int _favGen = 0;
   int _tripGen = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    fetchProfile(); // vurgu rengini uygular
+    loadStickers();
+  }
+
   void _select(int i) {
     setState(() {
       if (i == 1) _favGen++; // sekmeye her girişte liste yenilensin
@@ -311,17 +324,19 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _load() async {
-    try {
-      final res = await http.get(Uri.parse('$baseUrl/api/me'), headers: authHeaders());
-      if (res.statusCode == 200) {
-        final j = jsonDecode(utf8.decode(res.bodyBytes));
-        if (j is Map<String, dynamic> && mounted) setState(() => _me = j);
-      }
-    } catch (_) {}
+    final j = await fetchProfile();
+    if (j != null && mounted) setState(() => _me = j);
+  }
+
+  Future<void> _edit() async {
+    final updated = await showEditProfileDialog(context, _me ?? <String, dynamic>{});
+    if (updated != null && mounted) setState(() => _me = updated);
   }
 
   void _logout() {
     authToken = null;
+    accentColor.value = kDefaultAccent;
+    myStickers.value = <Map<String, dynamic>>[];
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginPage()),
       (route) => false,
@@ -336,7 +351,16 @@ class _ProfilePageState extends State<ProfilePage> {
     final email = '${_me?['email'] ?? ''}';
     final initial = name.isNotEmpty ? name.characters.first.toUpperCase() : '?';
     return Scaffold(
-      appBar: AppBar(title: Text(t('Profil', 'Profile'))),
+      appBar: AppBar(
+        title: Text(t('Profil', 'Profile')),
+        actions: [
+          IconButton(
+            tooltip: t('Profili düzenle', 'Edit profile'),
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: _edit,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -355,6 +379,21 @@ class _ProfilePageState extends State<ProfilePage> {
             Center(
               child: Text(email, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
             ),
+          if ('${_me?['bio'] ?? ''}'.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: Text(
+                '“${_me?['bio']}”',
+                textAlign: TextAlign.center,
+                style: tt.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          ValueListenableBuilder<List<Map<String, dynamic>>>(
+            valueListenable: myStickers,
+            builder: (_, list, __) => StickerSummary(stickers: list),
+          ),
           const SizedBox(height: 28),
           Text(t('Görünüm', 'Appearance'), style: tt.titleSmall),
           const SizedBox(height: 8),
@@ -404,7 +443,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 24),
           Center(
-            child: Text(t('Explore World · yapay zekâ destekli seyahat rehberi', 'Explore World · AI-powered travel guide'),
+            child: Text(t('Zaino · yapay zekâ destekli seyahat rehberi', 'Zaino · AI-powered travel guide'),
                 style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
           ),
         ],
