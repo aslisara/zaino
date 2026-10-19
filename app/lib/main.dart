@@ -22,7 +22,12 @@ Map<String, String> authHeaders() => {
       if (authToken != null) 'Authorization': 'Bearer $authToken',
     };
 
-void main() => runApp(const ExploreApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final theme = await loadPrefs();
+  themeMode.value = ThemeMode.values.firstWhere((m) => m.name == theme, orElse: () => ThemeMode.system);
+  runApp(const ExploreApp());
+}
 
 /// Açık / koyu / sistem teması (Profil sekmesinden değişir).
 final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
@@ -415,7 +420,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     label: Text(t('Koyu', 'Dark'))),
               ],
               selected: {mode},
-              onSelectionChanged: (s) => themeMode.value = s.first,
+              onSelectionChanged: (s) {
+                themeMode.value = s.first;
+                savePref('theme', s.first.name);
+              },
             ),
           ),
           const SizedBox(height: 28),
@@ -431,6 +439,7 @@ class _ProfilePageState extends State<ProfilePage> {
               selected: {lang},
               onSelectionChanged: (s) {
                 appLang.value = s.first;
+                savePref('lang', s.first);
                 rebuildAll();
               },
             ),
