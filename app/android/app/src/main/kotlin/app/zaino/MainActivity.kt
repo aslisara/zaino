@@ -1,4 +1,4 @@
-package com.exploreworld.exploreworld_app
+package app.zaino
 
 import io.flutter.embedding.android.FlutterActivity
 
