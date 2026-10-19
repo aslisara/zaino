@@ -1081,7 +1081,9 @@ class _AiGuidePageState extends State<AiGuidePage> {
           _lines = _parse(_extractText(body));
         });
       } else {
-        setState(() => _error = t('Rehber alınamadı (${res.statusCode})', 'Could not get the guide (${res.statusCode})'));
+        setState(() => _error = res.statusCode == 429
+            ? aiLimitText()
+            : t('Rehber alınamadı (${res.statusCode})', 'Could not get the guide (${res.statusCode})'));
       }
     } catch (e) {
       setState(() => _error = t('Rehber alınamadı. Backend açık mı? ($e)', 'Could not get the guide. Is the backend running? ($e)'));

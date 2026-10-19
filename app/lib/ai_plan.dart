@@ -48,6 +48,7 @@ Future<Map<String, dynamic>> _askPlan(String city, String country, int days, Str
   final res = await http
       .post(Uri.parse('$baseUrl/api/ai'), headers: authHeaders(), body: jsonEncode({'prompt': prompt}))
       .timeout(const Duration(seconds: 90));
+  if (res.statusCode == 429) throw Exception(aiLimitText());
   if (res.statusCode != 200) {
     throw Exception(t('Yapay zekâ yanıt vermedi (${res.statusCode}).', 'The AI did not respond (${res.statusCode}).'));
   }

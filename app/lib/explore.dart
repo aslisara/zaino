@@ -367,6 +367,7 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
         headers: authHeaders(),
         body: jsonEncode({'prompt': prompt}),
       );
+      if (res.statusCode == 429) throw Exception(aiLimitText());
       if (res.statusCode != 200) {
         throw Exception(t('Sunucu ${res.statusCode} döndü', 'Server returned ${res.statusCode}'));
       }
@@ -406,6 +407,11 @@ class _ExplorePageState extends State<ExplorePage> with TickerProviderStateMixin
           .post(Uri.parse('$baseUrl/api/ai'),
               headers: authHeaders(), body: jsonEncode({'prompt': prompt}))
           .timeout(const Duration(seconds: 60));
+      if (res.statusCode == 429) {
+        if (!mounted) return;
+        setState(() => _cultureError = aiLimitText());
+        return;
+      }
       if (res.statusCode != 200) throw Exception('${res.statusCode}');
       final text = _extractText(jsonDecode(utf8.decode(res.bodyBytes)));
       final a = text.indexOf('{');

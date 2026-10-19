@@ -39,3 +39,7 @@ Future<void> savePref(String key, String value) async {
     await p.setString(key, value);
   } catch (_) {}
 }
+
+/// Günlük yapay zekâ hakkı dolunca (HTTP 429) gösterilen mesaj.
+String aiLimitText() => t('Günlük yapay zekâ hakkın doldu. Yarın tekrar dene.',
+    "You've used today's AI quota. Try again tomorrow.");
